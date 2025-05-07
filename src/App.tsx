@@ -12,6 +12,7 @@ const App = () => {
     emotion,
     isListening,
     isSpeaking,
+    audioPlayer,
   } = useVoiceAssistant();
 
   return (
@@ -30,6 +31,7 @@ const App = () => {
         inputText={inputText}
         replyText={replyText}
         isListening={isListening}
+        audioPlayer={audioPlayer}
       />
     </div>
   );

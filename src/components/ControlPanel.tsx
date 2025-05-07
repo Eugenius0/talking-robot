@@ -1,4 +1,4 @@
-import React from "react";
+import React, { RefObject } from "react";
 import "./ControlPanel.css";
 
 interface ControlPanelProps {
@@ -7,6 +7,7 @@ interface ControlPanelProps {
   inputText: string;
   replyText: string;
   isListening: boolean;
+  audioPlayer: RefObject<HTMLAudioElement | null>;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -15,6 +16,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   inputText,
   replyText,
   isListening,
+  audioPlayer,
 }) => {
   return (
     <div id="ui">
@@ -39,7 +41,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       <p>
         <strong>ChatGPT says:</strong> <span id="replyText">{replyText}</span>
       </p>
-      <audio id="audioPlayer" autoPlay controls style={{ display: "none" }}>
+      <audio ref={audioPlayer} autoPlay controls style={{ display: "none" }}>
         <track
           kind="captions"
           src="captions.vtt"
