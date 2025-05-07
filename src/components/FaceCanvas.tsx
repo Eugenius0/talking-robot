@@ -14,11 +14,12 @@ const FaceCanvas: React.FC<Props> = ({ expression, isSpeaking }) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    let animationId: number;
     let eyeOffset = 0;
     let browOffset = 0;
     let blink = false;
 
-    const drawFace = () => {
+    const drawFace = (openness: number) => {
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
       const fw = canvas.width * 0.75;
@@ -33,7 +34,7 @@ const FaceCanvas: React.FC<Props> = ({ expression, isSpeaking }) => {
 
       drawEyes(cx, cy, fw);
       drawEyebrows(cx, cy, fw);
-      drawMouth(cx, cy, fw);
+      drawMouth(cx, cy, fw, openness);
     };
 
     const drawEyes = (cx: number, cy: number, fw: number) => {
@@ -71,14 +72,18 @@ const FaceCanvas: React.FC<Props> = ({ expression, isSpeaking }) => {
       ctx.stroke();
     };
 
-    const drawMouth = (cx: number, cy: number, fw: number) => {
+    const drawMouth = (
+      cx: number,
+      cy: number,
+      fw: number,
+      openness: number
+    ) => {
       ctx.strokeStyle = "white";
       ctx.fillStyle = "white";
       ctx.lineWidth = fw * 0.01;
       const y = cy + fw * 0.05;
 
       if (isSpeaking) {
-        const openness = Math.abs(Math.sin(Date.now() / 80)) * 20 + 5;
         ctx.beginPath();
         ctx.ellipse(cx, y, fw * 0.06, openness, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -96,8 +101,13 @@ const FaceCanvas: React.FC<Props> = ({ expression, isSpeaking }) => {
       setTimeout(() => {
         blink = false;
       }, 200);
-      drawFace();
-      requestAnimationFrame(animate);
+
+      const openness = isSpeaking
+        ? Math.abs(Math.sin(Date.now() / 80)) * 20 + 5
+        : 0;
+
+      drawFace(openness);
+      animationId = requestAnimationFrame(animate);
     };
 
     const resize = () => {
@@ -107,13 +117,19 @@ const FaceCanvas: React.FC<Props> = ({ expression, isSpeaking }) => {
 
     resize();
     window.addEventListener("resize", resize);
-    animate();
+    animationId = requestAnimationFrame(animate);
 
-    return () => window.removeEventListener("resize", resize);
+    return () => {
+      window.removeEventListener("resize", resize);
+      cancelAnimationFrame(animationId);
+    };
   }, [expression, isSpeaking]);
 
   return (
-    <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }} />
+    <canvas
+      ref={canvasRef}
+      style={{ position: "absolute", top: 0, left: 0, backgroundColor: "#111" }}
+    />
   );
 };
 

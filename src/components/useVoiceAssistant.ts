@@ -142,9 +142,13 @@ export function useVoiceAssistant() {
       if (audioPlayer.current) {
         audioPlayer.current.src = ttsUrl;
         setIsSpeaking(true);
-        audioPlayer.current.play().finally(() => {
+        const player = audioPlayer.current;
+        player.onended = () => {
           setIsSpeaking(false);
-        });
+        };
+      setIsSpeaking(true);
+      player.play();
+
       }
       
 
