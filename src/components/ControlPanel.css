@@ -4,21 +4,24 @@
     left: 20px;
     width: 360px;
     padding: 20px;
-    background-color: rgba(20, 20, 20, 0.9);
-    border: 1px solid #333;
+    background-color: transparent;
+    border: 1px solid transparent;
     border-radius: 12px;
     font-family: "Segoe UI", sans-serif;
-    color: #ffffff;
+    color: transparent;
     z-index: 10;
   }
   
   #ui h1 {
+    color: transparent;
     font-size: 1.5rem;
     margin-bottom: 12px;
-    color: #00bfff;
   }
   
   #talkBtn {
+    position: fixed;              
+    bottom: 20px;                 
+    left: 20px;  
     padding: 10px 20px;
     font-size: 1rem;
     border: none;
@@ -35,8 +38,8 @@
   #status,
   #inputText,
   #replyText {
-    display: inline-block;
-    color: #90ee90;
+    display: inline-hidden;
+    color: transparent;
     font-weight: bold;
   }
   

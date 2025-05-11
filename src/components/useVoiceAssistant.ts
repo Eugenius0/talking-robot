@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-const OPENAI_API_KEY = "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"; // Replace with your real API key
+const OPENAI_API_KEY = ""; // Replace with your real API key
 
 type Emotion = "neutral" | "happy" | "sad" | "angry" | "surprised" | "shy";
 
