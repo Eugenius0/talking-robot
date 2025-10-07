@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-const OPENAI_API_KEY = "";
+const OPENAI_API_KEY =""
 type Emotion = "neutral" | "happy" | "sad" | "angry" | "surprised" | "shy";
 
 export function useVoiceAssistant() {
@@ -15,6 +15,9 @@ export function useVoiceAssistant() {
   const audioChunks = useRef<Blob[]>([]);
   const recorder = useRef<MediaRecorder | null>(null);
   const audioPlayer = useRef<HTMLAudioElement | null>(null);
+  const audioQueue = useRef<string[]>([]);
+  const isPlayingQueue = useRef(false);
+  const streamBuffer = useRef("");
 
   const startListening = async () => {
     try {
@@ -101,7 +104,8 @@ export function useVoiceAssistant() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4",
+          model: "gpt-3.5-turbo",
+          stream: true,
           messages: [
             {
               role: "system",
@@ -115,41 +119,59 @@ export function useVoiceAssistant() {
         }),
       });
 
-      const chatData = await chatRes.json();
-      const reply = chatData.choices[0].message.content;
-      setReplyText(reply);
-      detectEmotion(reply);
+      if (!chatRes.body) throw new Error("No response stream");
 
-      setStatus("Generating speech...");
+      setStatus("Embeddy is responding...");
+      streamBuffer.current = "";
+      audioQueue.current = [];
+      isPlayingQueue.current = false;
+      let fullResponse = "";
 
-      const ttsRes = await fetch("https://api.openai.com/v1/audio/speech", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "tts-1-hd",
-          voice: "fable",
-          input: reply,
-        }),
-      });
+      const reader = chatRes.body.getReader();
+      const decoder = new TextDecoder();
 
-      const ttsBlob = await ttsRes.blob();
-      const ttsUrl = URL.createObjectURL(ttsBlob);
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-      if (audioPlayer.current) {
-        audioPlayer.current.src = ttsUrl;
-        setIsSpeaking(true);
-        const player = audioPlayer.current;
-        player.onended = () => {
-          setIsSpeaking(false);
-        };
-      setIsSpeaking(true);
-      player.play();
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
 
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                const content = parsed.choices?.[0]?.delta?.content;
+                
+                if (content) {
+                  fullResponse += content;
+                  streamBuffer.current += content;
+                  setReplyText(fullResponse); // Update UI immediately
+                  
+                  // Check if we have a complete sentence to convert
+                  await processStreamBuffer();
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+        }
+
+        // Process any remaining text
+        if (streamBuffer.current.trim()) {
+          await convertAndQueue(streamBuffer.current.trim());
+        }
+
+        detectEmotion(fullResponse);
+      } finally {
+        reader.releaseLock();
       }
-
+      
 
       setStatus("Done");
     } catch (err) {
@@ -157,6 +179,156 @@ export function useVoiceAssistant() {
       setStatus("Error");
     } finally {
       setIsListening(false);
+    }
+  };
+
+  // Process streaming text buffer and extract complete sentences
+  const processStreamBuffer = async () => {
+    const text = streamBuffer.current;
+    
+    // Look for complete sentences (ending with . ! ?)
+    const sentenceMatch = text.match(/^(.*?[.!?])\s+(.*)$/);
+    
+    if (sentenceMatch) {
+      const completeSentence = sentenceMatch[1].trim();
+      const remaining = sentenceMatch[2];
+      
+      if (completeSentence.length > 5) { // Avoid tiny fragments
+        streamBuffer.current = remaining;
+        await convertAndQueue(completeSentence);
+      }
+    }
+  };
+
+  // Convert text to speech and add to queue
+  const convertAndQueue = async (text: string) => {
+    if (!text.trim()) return;
+
+    try {
+      const audioUrl = await generateSingleTTS(text);
+      if (audioUrl) {
+        audioQueue.current.push(audioUrl);
+        
+        // Start playing if not already playing
+        if (!isPlayingQueue.current) {
+          playAudioQueue();
+        }
+      }
+    } catch (error) {
+      console.error("Error converting text to speech:", error);
+    }
+  };
+
+  // Play queued audio segments in sequence
+  const playAudioQueue = async () => {
+    if (isPlayingQueue.current || audioQueue.current.length === 0) return;
+    
+    isPlayingQueue.current = true;
+    setIsSpeaking(true);
+
+    while (audioQueue.current.length > 0) {
+      const audioUrl = audioQueue.current.shift();
+      if (audioUrl && audioPlayer.current) {
+        try {
+          audioPlayer.current.src = audioUrl;
+          
+          // Wait for this segment to finish before playing next
+          await new Promise<void>((resolve) => {
+            if (audioPlayer.current) {
+              audioPlayer.current.onended = () => resolve();
+              audioPlayer.current.onerror = () => resolve(); // Skip on error
+              audioPlayer.current.play();
+            }
+          });
+          
+          // Small gap between segments
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+          console.error("Audio playback error:", error);
+        }
+      }
+    }
+
+    isPlayingQueue.current = false;
+    setIsSpeaking(false);
+    setStatus("Ready");
+  };
+
+  const playResponseInParts = async (text: string) => {
+    // Find first sentence or split at roughly halfway point
+    const firstSentenceEnd = text.search(/[.!?]\s/);
+    
+    let firstPart, secondPart;
+    
+    if (firstSentenceEnd > 0 && firstSentenceEnd < text.length * 0.7) {
+      // Split at first sentence if it's not too long
+      firstPart = text.substring(0, firstSentenceEnd + 1);
+      secondPart = text.substring(firstSentenceEnd + 2);
+    } else {
+      // Split roughly in half at a word boundary
+      const midPoint = Math.floor(text.length / 2);
+      const splitPoint = text.lastIndexOf(' ', midPoint);
+      firstPart = text.substring(0, splitPoint);
+      secondPart = text.substring(splitPoint + 1);
+    }
+
+    // Generate and play first part immediately
+    try {
+      const firstAudio = await generateSingleTTS(firstPart);
+      if (firstAudio && audioPlayer.current) {
+        audioPlayer.current.src = firstAudio;
+        setIsSpeaking(true);
+        
+        // Start generating second part while first plays
+        const secondAudioPromise = generateSingleTTS(secondPart);
+        
+        audioPlayer.current.onended = async () => {
+          // Play second part when first ends
+          try {
+            const secondAudio = await secondAudioPromise;
+            if (secondAudio && audioPlayer.current) {
+              audioPlayer.current.src = secondAudio;
+              audioPlayer.current.onended = () => setIsSpeaking(false);
+              audioPlayer.current.play();
+            } else {
+              setIsSpeaking(false);
+            }
+          } catch (error) {
+            console.error("Error with second part:", error);
+            setIsSpeaking(false);
+          }
+        };
+        
+        audioPlayer.current.play();
+      }
+    } catch (error) {
+      console.error("Error with first part:", error);
+      setIsSpeaking(false);
+    }
+  };
+
+  const generateSingleTTS = async (text: string): Promise<string | null> => {
+    if (!text.trim()) return null;
+    
+    try {
+      const ttsRes = await fetch("https://api.openai.com/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "tts-1",
+          voice: "fable",
+          input: text.trim(),
+        }),
+      });
+
+      const ttsBlob = await ttsRes.blob();
+      return URL.createObjectURL(ttsBlob);
+    } catch (error) {
+      console.error("TTS generation error:", error);
+      return null;
     }
   };
 
