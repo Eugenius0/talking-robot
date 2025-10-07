@@ -24,7 +24,11 @@ const App = () => {
         overflow: "hidden",
       }}
     >
-      <FaceCanvas expression={emotion} isSpeaking={isSpeaking} />
+      <FaceCanvas
+        expression={emotion}
+        isSpeaking={isSpeaking}
+        audioElement={audioPlayer}
+      />
       <ControlPanel
         onTalk={startListening}
         status={status}

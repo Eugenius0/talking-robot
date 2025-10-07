@@ -11,17 +11,17 @@
     color: transparent;
     z-index: 10;
   }
-  
+
   #ui h1 {
-    color: transparent;
     font-size: 1.5rem;
     margin-bottom: 12px;
+    color: transparent;
   }
-  
+
   #talkBtn {
-    position: fixed;              
-    bottom: 20px;                 
-    left: 20px;  
+    position:fixed;
+    bottom:20px;
+    left:20px;
     padding: 10px 20px;
     font-size: 1rem;
     border: none;
@@ -30,22 +30,21 @@
     color: #fff;
     transition: background-color 0.3s;
   }
-  
+
   #talkBtn:enabled:hover {
     background-color: #0056b3;
   }
-  
+
   #status,
   #inputText,
   #replyText {
-    display: inline-hidden;
+    display: inline-hidden; /*inline-block;*/
     color: transparent;
     font-weight: bold;
   }
-  
+
   p {
     margin: 6px 0;
     font-size: 0.95rem;
     line-height: 1.4;
   }
-  

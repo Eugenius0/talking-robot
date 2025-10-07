@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 
-const OPENAI_API_KEY = ""; // Replace with your real API key
-
+const OPENAI_API_KEY = "";
 type Emotion = "neutral" | "happy" | "sad" | "angry" | "surprised" | "shy";
 
 export function useVoiceAssistant() {
@@ -150,7 +149,7 @@ export function useVoiceAssistant() {
       player.play();
 
       }
-      
+
 
       setStatus("Done");
     } catch (err) {
